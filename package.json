@@ -1,0 +1,15 @@
+{
+  "name": "strict-headers",
+  "version": "0.1.0",
+  "description": "Parse raw HTTP header blocks into structured data with line/column error messages",
+  "license": "MIT",
+  "author": "lindaj78",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  }
+}
