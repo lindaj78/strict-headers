@@ -33,6 +33,26 @@ function formatMessage(line: number, column: number, reason: string, sourceLine:
   ].join("\n");
 }
 
+/**
+ * Thrown instead of a single HeaderParseError when a header block has more
+ * than one malformed line, so a caller sees every problem in one pass rather
+ * than fixing them one at a time by re-running the parser.
+ */
+export class HeaderParseErrors extends Error {
+  readonly errors: HeaderParseError[];
+
+  constructor(errors: HeaderParseError[]) {
+    super(formatMultiple(errors));
+    this.name = "HeaderParseErrors";
+    this.errors = errors;
+  }
+}
+
+function formatMultiple(errors: HeaderParseError[]): string {
+  const summary = `${errors.length} header lines failed to parse:`;
+  return [summary, ...errors.map((err) => err.message)].join("\n\n");
+}
+
 /** Renders a single character (control chars included) for use inside an error message. */
 export function describeChar(ch: string): string {
   switch (ch) {

@@ -1,4 +1,4 @@
-import { describeChar, HeaderParseError } from "./errors";
+import { describeChar, HeaderParseError, HeaderParseErrors } from "./errors";
 
 export interface ParsedHeader {
   name: string;
@@ -13,7 +13,13 @@ const TCHAR = /[!#$%&'*+\-.^_`|~0-9A-Za-z]/;
 /**
  * Parses a raw block of HTTP header lines (the part of a request or response
  * between the start line and the blank line before the body) into structured
- * headers. Throws HeaderParseError on the first malformed line.
+ * headers.
+ *
+ * Every line is checked, not just the first malformed one: a bad line is
+ * recorded and skipped so the rest of the block still gets validated. If
+ * exactly one line failed, the original HeaderParseError is thrown as before;
+ * if more than one failed, a HeaderParseErrors wrapping all of them is thrown
+ * instead, so a caller can fix a header block in one pass.
  *
  * A blank line ends the header section, mirroring how HTTP messages work, so
  * it's fine to pass a whole raw response and let this function stop at the body.
@@ -21,6 +27,7 @@ const TCHAR = /[!#$%&'*+\-.^_`|~0-9A-Za-z]/;
 export function parseHeaders(input: string): ParsedHeader[] {
   const lines = input.split(/\r\n|\n/);
   const headers: ParsedHeader[] = [];
+  const errors: HeaderParseError[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i] as string;
@@ -31,16 +38,33 @@ export function parseHeaders(input: string): ParsedHeader[] {
     }
 
     if (rawLine[0] === " " || rawLine[0] === "\t") {
-      throw new HeaderParseError(
-        lineNumber,
-        1,
-        "obsolete line folding is not supported; continuation lines starting with " +
-          "whitespace were removed from HTTP/1.1 (RFC 7230 §3.2.4)",
-        rawLine,
+      errors.push(
+        new HeaderParseError(
+          lineNumber,
+          1,
+          "obsolete line folding is not supported; continuation lines starting with " +
+            "whitespace were removed from HTTP/1.1 (RFC 7230 §3.2.4)",
+          rawLine,
+        ),
       );
+      continue;
     }
 
-    headers.push(parseLine(rawLine, lineNumber));
+    try {
+      headers.push(parseLine(rawLine, lineNumber));
+    } catch (err) {
+      if (!(err instanceof HeaderParseError)) {
+        throw err;
+      }
+      errors.push(err);
+    }
+  }
+
+  if (errors.length === 1) {
+    throw errors[0];
+  }
+  if (errors.length > 1) {
+    throw new HeaderParseErrors(errors);
   }
 
   return headers;

@@ -73,6 +73,28 @@ between the field name and the colon (a known request-smuggling vector when
 two servers disagree on which side of the whitespace is authoritative), an
 obsolete folded continuation line, and control characters in a field value.
 
+### Multiple bad lines
+
+A single malformed line throws that line's `HeaderParseError` directly, as
+above. If a block has more than one bad line, `parseHeaders` throws
+`HeaderParseErrors` instead, which carries every offending line's
+`HeaderParseError` in its `errors` array so you don't have to fix them one at
+a time and re-run the parser:
+
+```ts
+import { parseHeaders, HeaderParseErrors } from "strict-headers";
+
+try {
+  parseHeaders(raw);
+} catch (err) {
+  if (err instanceof HeaderParseErrors) {
+    for (const single of err.errors) {
+      console.error(single.message);
+    }
+  }
+}
+```
+
 ## Grammar notes
 
 The parser follows RFC 9110 §5 and RFC 7230 §3.2:
@@ -100,7 +122,7 @@ tsc
 
 ## Status
 
-Early. See the issues / roadmap for what's not covered yet - notably,
-parsing currently stops at the first error instead of collecting all of
-them, and there's no semantic validation of well-known headers (e.g.
-rejecting a non-numeric `Content-Length`).
+Early. Parsing now collects every malformed line in a block instead of
+stopping at the first one. See the issues / roadmap for what's still
+missing - notably, there's no semantic validation of well-known headers yet
+(e.g. rejecting a non-numeric `Content-Length`).
