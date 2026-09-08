@@ -1,4 +1,6 @@
 import { describeChar, HeaderParseError, HeaderParseErrors } from "./errors";
+import { TCHAR } from "./grammar";
+import { validateWellKnownHeader } from "./semantics";
 
 export interface ParsedHeader {
   name: string;
@@ -6,9 +8,6 @@ export interface ParsedHeader {
   /** 1-based line number of the header in the original input. */
   line: number;
 }
-
-// tchar, RFC 9110 §5.6.2 - the set of characters a field name is allowed to use.
-const TCHAR = /[!#$%&'*+\-.^_`|~0-9A-Za-z]/;
 
 /**
  * Parses a raw block of HTTP header lines (the part of a request or response
@@ -23,6 +22,11 @@ const TCHAR = /[!#$%&'*+\-.^_`|~0-9A-Za-z]/;
  *
  * A blank line ends the header section, mirroring how HTTP messages work, so
  * it's fine to pass a whole raw response and let this function stop at the body.
+ *
+ * A handful of headers (Content-Length, Content-Type) get their value grammar
+ * checked too, not just the field-name/field-value syntax - see semantics.ts.
+ * A header that fails that check is treated the same as a structurally bad
+ * line: it's reported as an error and left out of the returned array.
  */
 export function parseHeaders(input: string): ParsedHeader[] {
   const lines = input.split(/\r\n|\n/);
@@ -51,7 +55,13 @@ export function parseHeaders(input: string): ParsedHeader[] {
     }
 
     try {
-      headers.push(parseLine(rawLine, lineNumber));
+      const header = parseLine(rawLine, lineNumber);
+      const semanticError = validateWellKnownHeader(header, rawLine, lineNumber);
+      if (semanticError) {
+        errors.push(semanticError);
+      } else {
+        headers.push(header);
+      }
     } catch (err) {
       if (!(err instanceof HeaderParseError)) {
         throw err;

@@ -73,6 +73,29 @@ between the field name and the colon (a known request-smuggling vector when
 two servers disagree on which side of the whitespace is authoritative), an
 obsolete folded continuation line, and control characters in a field value.
 
+### Well-known headers
+
+A couple of headers have a value grammar of their own, and a value can be
+valid field-value syntax while still being wrong for the header it's on. For
+these, `parseHeaders` also checks the value against its specific grammar:
+
+- `Content-Length` must be `1*DIGIT` (RFC 9110 §8.6) - no sign, no decimal
+  point, no stray characters.
+- `Content-Type` must be `type/subtype` optionally followed by `; name=value`
+  parameters (RFC 9110 §8.3), with quoted-string parameter values supported.
+
+```ts
+parseHeaders("Content-Length: 12mb\r\n\r\n");
+// throws HeaderParseError:
+// Content-Length must be a non-negative integer, found 'm' (line 1, column 19)
+```
+
+A header that fails this check is reported the same way a structurally bad
+line is - one bad line throws its `HeaderParseError` directly, more than one
+throws them batched in a `HeaderParseErrors`, and the header is left out of
+the returned array. Headers other than these two are passed through without
+semantic checks.
+
 ### Multiple bad lines
 
 A single malformed line throws that line's `HeaderParseError` directly, as
@@ -122,7 +145,8 @@ tsc
 
 ## Status
 
-Early. Parsing now collects every malformed line in a block instead of
-stopping at the first one. See the issues / roadmap for what's still
-missing - notably, there's no semantic validation of well-known headers yet
-(e.g. rejecting a non-numeric `Content-Length`).
+Early. Parsing collects every malformed line in a block instead of stopping
+at the first one, and checks `Content-Length` and `Content-Type` values
+against their own grammar on top of the general field-value syntax. Still
+missing: a serializer to go from structured headers back to raw text, and
+support for a few other things - see the roadmap.
