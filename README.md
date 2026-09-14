@@ -118,6 +118,29 @@ try {
 }
 ```
 
+## Serializing
+
+`writeHeaders` goes the other direction: structured `{ name, value }` pairs
+back to a raw, CRLF-terminated header block, including the trailing blank
+line.
+
+```ts
+import { writeHeaders } from "strict-headers";
+
+writeHeaders([
+  { name: "Host", value: "example.com" },
+  { name: "Content-Type", value: "application/json" },
+]);
+// "Host: example.com\r\nContent-Type: application/json\r\n\r\n"
+```
+
+It checks each name and value against the same grammar `parseHeaders`
+enforces and throws a `TypeError` if either is invalid, so it can't produce a
+block that `parseHeaders` would then refuse to read back. A value with
+leading or trailing whitespace is also rejected, rather than written as-is,
+since `parseHeaders` strips that whitespace on the way back in and the round
+trip would otherwise quietly change the value.
+
 ## Grammar notes
 
 The parser follows RFC 9110 §5 and RFC 7230 §3.2:
@@ -146,7 +169,15 @@ tsc
 ## Status
 
 Early. Parsing collects every malformed line in a block instead of stopping
-at the first one, and checks `Content-Length` and `Content-Type` values
-against their own grammar on top of the general field-value syntax. Still
-missing: a serializer to go from structured headers back to raw text, and
-support for a few other things - see the roadmap.
+at the first one, checks `Content-Length` and `Content-Type` values against
+their own grammar on top of the general field-value syntax, and `writeHeaders`
+serializes structured headers back to raw text. Still missing: support for a
+few other things - see the roadmap.
+
+### Roadmap
+
+- Support bare CR line endings, not just CRLF and LF.
+- Configurable duplicate-header detection (reject, keep first, keep last, or
+  combine per RFC 9110 §5.3).
+- A streaming parser for chunked input.
+- A test suite.

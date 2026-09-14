@@ -133,7 +133,7 @@ function parseLine(rawLine: string, lineNumber: number): ParsedHeader {
 
 // field-vchar, RFC 9110 §5.5 - VCHAR, SP, HTAB, plus obs-text (0x80-0xFF) for
 // legacy servers that stuff latin-1 into header values.
-function isValidValueChar(code: number): boolean {
+export function isValidValueChar(code: number): boolean {
   if (code === 0x09 || code === 0x20) return true;
   if (code >= 0x21 && code <= 0x7e) return true;
   if (code >= 0x80 && code <= 0xff) return true;
